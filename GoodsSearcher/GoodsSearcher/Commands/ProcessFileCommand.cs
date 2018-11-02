@@ -5,6 +5,10 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using GoodsSearcher.ViewModels;
 using Sraper.Common;
+using Flurl;
+using Flurl.Http;
+using System.Linq;
+using System.Net;
 
 namespace GoodsSearcher.Commands
 {
@@ -19,35 +23,44 @@ namespace GoodsSearcher.Commands
         }
         public bool CanExecute(object parameter)
         {
-            return !string.IsNullOrEmpty(parent.InputFileProcessingLabelData) &&
-                    !string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData) &&
-                    !parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
+            return true;
+            //return !string.IsNullOrEmpty(parent.InputFileProcessingLabelData) &&
+            //        !string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData) &&
+            //        !parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
         }
 
         public void Execute(object parameter)
         {
-            string inputFileChosenPath = parent.InputFileProcessingLabelData;
-            string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
-            
-            if (string.IsNullOrEmpty(inputFileChosenPath.Trim()))
-            {
-                return;
-            }
-            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+            //string inputFileChosenPath = parent.InputFileProcessingLabelData;
+            //string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
+
+            //if (string.IsNullOrEmpty(inputFileChosenPath.Trim()))
+            //{
+            //    return;
+            //}
+            //parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+            Cookie cookie;
             try
             {
-                Task.Factory.StartNew(() =>
+                Task.Factory.StartNew(async () =>
                 {
-                    //ShareholderAnalyzerLogic ms = new ShareholderAnalyzerLogic();
-                    //ms.ProcessFile(chosenPath, chosenFodlerPath);
-                })
-                .ContinueWith((action) =>
-                {
-                    Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() => {
-                        parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
-                        Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
-                    }));
+                    using (var cli = new FlurlClient("https://www.merchantwords.com").EnableCookies())
+                    {
+                        await cli.Request("/login").PostJsonAsync(new
+                        {
+                            email = "goncalo.cabecinha@gmail.com",
+                            password = "qwertymns"
+                        });
+                        cookie = cli.Cookies.First().Value;
+                    }
                 });
+                //.ContinueWith((action) =>
+                //{
+                //    Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() => {
+                //        parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+                //        Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+                //    }));
+                //});
             }
             catch (Exception)
             {
