@@ -31,5 +31,14 @@ namespace Sraper.Common.Models
 			}
 			return htmlDoc;
 		}
-    }
+
+		public static HtmlNode GetSearchResultsTable(string pageContent)
+		{
+			HtmlDocument htmlDocument = new HtmlDocument();
+			htmlDocument.LoadHtml(pageContent);
+
+			return htmlDocument.DocumentNode
+			.SelectSingleNode("/html[1]/body[1]/div[2]/section[1]/div[2]/div[1]/div[1]/div[2]/table[1]");
+		}
+	}
 }

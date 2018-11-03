@@ -28,22 +28,6 @@ namespace GoodsSearcher.Common.Helpers
 			return selectedFileName;
 		}
 
-		public static string SelectFolder()
-		{
-			FolderBrowserDialog openFolderDialog = new FolderBrowserDialog();
-
-			string selectedFolderName = string.Empty;
-			if (openFolderDialog.ShowDialog() == DialogResult.OK)
-			{
-				selectedFolderName = openFolderDialog.SelectedPath;
-			}
-			else
-			{
-				selectedFolderName = string.Empty;
-			}
-			return selectedFolderName;
-		}
-
 		public static DataTable ConvertCSVtoDataTable(string strFilePath)
 		{
 			StreamReader sr = new StreamReader(strFilePath);
@@ -54,26 +38,27 @@ namespace GoodsSearcher.Common.Helpers
 				dt.Columns.Add(header);
 			}
 			string tab = '\u0009'.ToString();
-			string previousRow;
+			string previousRow = null;
 			while (!sr.EndOfStream)
 			{
 				var currentRow = sr.ReadLine();
-				if (currentRow.StartsWith(tab))
+				if (currentRow.StartsWith(tab) && !string.IsNullOrEmpty(previousRow))
 				{
-
+					currentRow = currentRow.Replace(tab, " ");
+					currentRow = previousRow + currentRow;
 				}
-				else
+				string[] rows = Regex.Split(currentRow, ",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+				if (rows.Count() == 1)
 				{
-
+					previousRow = currentRow;
+					continue;
 				}
-				previousRow = sr.ReadLine();
-				string[] rows = Regex.Split(sr.ReadLine(), ",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
 				DataRow dr = dt.NewRow();
 				for (int i = 0; i < headers.Length; i++)
 				{
-					dr[i] = rows[i];
+					dr[i] = rows[i].TrimStart('"').TrimEnd('"');
 				}
-
+				
 				dt.Rows.Add(dr);
 			}
 			return dt;

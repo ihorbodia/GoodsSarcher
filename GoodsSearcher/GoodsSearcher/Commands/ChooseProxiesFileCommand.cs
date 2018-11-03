@@ -1,4 +1,5 @@
-﻿using GoodsSearcher.ViewModels;
+﻿using GoodsSearcher.Common.Helpers;
+using GoodsSearcher.ViewModels;
 using Sraper.Common;
 using System;
 using System.Windows.Input;

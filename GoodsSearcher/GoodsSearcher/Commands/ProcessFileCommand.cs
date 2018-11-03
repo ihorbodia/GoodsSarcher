@@ -11,6 +11,8 @@ using System.Linq;
 using System.Net;
 using HtmlAgilityPack;
 using System.Data;
+using GoodsSearcher.Common.Helpers;
+using Sraper.Common.Models;
 
 namespace GoodsSearcher.Commands
 {
@@ -44,8 +46,9 @@ namespace GoodsSearcher.Commands
 
 			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
 			string url = "https://www.merchantwords.com";
-			var csvtable = FilesHelper.ConvertCSVtoDataTable(inputFileChosenPath);
-
+			var titles = FilesHelper.ConvertCSVtoDataTable(inputFileChosenPath)
+				.AsEnumerable()
+				.Select(s => s.Field<string>("eBay Title"));
 			try
             {
                 Task.Factory.StartNew(async () =>
@@ -64,21 +67,9 @@ namespace GoodsSearcher.Commands
 						.WithClient(cli)
 						.GetStringAsync();
 
-						HtmlDocument htmlDocument = new HtmlDocument();
-						htmlDocument.LoadHtml(page);
-
-						var htmlTable = htmlDocument.DocumentNode
-						.SelectSingleNode("/html[1]/body[1]/div[2]/section[1]/div[2]/div[1]/div[1]/div[2]/table[1]");
-
-						var headers = htmlDocument.DocumentNode.SelectNodes("//tr/th");
-						DataTable table = new DataTable();
-						foreach (HtmlNode header in headers)
-							table.Columns.Add(header.InnerText); // create columns from th
-																 // select rows with td elements 
-						foreach (var row in htmlDocument.DocumentNode.SelectNodes("//tr[td]"))
-							table.Rows.Add(row.SelectNodes("td").Select(td => td.InnerText).ToArray());
-
-                    }
+						var node = WebHelper.GetSearchResultsTable(page);
+						var table = DataHelper.ConvertHtmlTableToDataTable(node);
+					}
                 });
                 //.ContinueWith((action) =>
                 //{
