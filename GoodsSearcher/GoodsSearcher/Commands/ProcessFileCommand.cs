@@ -9,6 +9,8 @@ using Flurl;
 using Flurl.Http;
 using System.Linq;
 using System.Net;
+using HtmlAgilityPack;
+using System.Data;
 
 namespace GoodsSearcher.Commands
 {
@@ -31,27 +33,51 @@ namespace GoodsSearcher.Commands
 
         public void Execute(object parameter)
         {
-            //string inputFileChosenPath = parent.InputFileProcessingLabelData;
-            //string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
+			string inputFileChosenPath = parent.InputFileProcessingLabelData;
+			string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
 
-            //if (string.IsNullOrEmpty(inputFileChosenPath.Trim()))
-            //{
-            //    return;
-            //}
-            //parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
-            Cookie cookie;
-            try
+			if (string.IsNullOrEmpty(inputFileChosenPath))
+			{
+				return;
+			}
+			inputFileChosenPath = inputFileChosenPath.Trim();
+
+			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+			string url = "https://www.merchantwords.com";
+			var csvtable = FilesHelper.ConvertCSVtoDataTable(inputFileChosenPath);
+
+			try
             {
                 Task.Factory.StartNew(async () =>
                 {
-                    using (var cli = new FlurlClient("https://www.merchantwords.com").EnableCookies())
+                    using (var cli = new FlurlClient().EnableCookies())
                     {
-                        await cli.Request("/login").PostJsonAsync(new
-                        {
-                            email = "goncalo.cabecinha@gmail.com",
-                            password = "qwertymns"
-                        });
-                        cookie = cli.Cookies.First().Value;
+						await url.AppendPathSegment("login")
+						.WithClient(cli)
+						.PostUrlEncodedAsync(new
+						{
+							email = "goncalo.cabecinha@gmail.com",
+							password = "qwertymns"
+						});
+
+						var page = await url.AppendPathSegment("search/uk/one%20two%20three/sort-highest")
+						.WithClient(cli)
+						.GetStringAsync();
+
+						HtmlDocument htmlDocument = new HtmlDocument();
+						htmlDocument.LoadHtml(page);
+
+						var htmlTable = htmlDocument.DocumentNode
+						.SelectSingleNode("/html[1]/body[1]/div[2]/section[1]/div[2]/div[1]/div[1]/div[2]/table[1]");
+
+						var headers = htmlDocument.DocumentNode.SelectNodes("//tr/th");
+						DataTable table = new DataTable();
+						foreach (HtmlNode header in headers)
+							table.Columns.Add(header.InnerText); // create columns from th
+																 // select rows with td elements 
+						foreach (var row in htmlDocument.DocumentNode.SelectNodes("//tr[td]"))
+							table.Rows.Add(row.SelectNodes("td").Select(td => td.InnerText).ToArray());
+
                     }
                 });
                 //.ContinueWith((action) =>
