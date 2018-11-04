@@ -132,7 +132,7 @@ namespace GoodsSearcher.Commands
 				var secondDataTable = DataHelper.ConvertHtmlTableToDataTable(secondNode);
 
 				var thirdNode = WebHelper.GetSearchResultsTable(firstTablePage);
-				var thirdDataTable = DataHelper.ConvertHtmlTableToDataTable(thirdNode);
+				var thirdDataTable = DataHelper.ConvertHtmlTableToDataTable(thirdNode); //0, 2
 			}
 			catch (Exception ex)
 			{

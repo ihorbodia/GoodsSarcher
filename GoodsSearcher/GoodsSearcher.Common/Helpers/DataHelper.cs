@@ -7,6 +7,10 @@ namespace GoodsSearcher.Common.Helpers
 	{
 		public static DataTable ConvertHtmlTableToDataTable(HtmlNode table)
 		{
+			if (table == null)
+			{
+				return null;
+			}
 			var headers = table.SelectNodes("//tr/th");
 			DataTable dataTable = new DataTable();
 
