@@ -15,10 +15,10 @@ namespace GoodsSearcher.Common.Helpers
 			DataTable dataTable = new DataTable();
 
 			foreach (HtmlNode header in headers)
-				dataTable.Columns.Add(header.InnerText);
+				dataTable.Columns.Add(header.InnerText.Trim());
 
 			foreach (var row in table.SelectNodes("//tr[td]"))
-				dataTable.Rows.Add(row.SelectNodes("td").Select(td => td.InnerText).ToArray());
+				dataTable.Rows.Add(row.SelectNodes("td").Select(td => td.InnerText.Trim().ToLower()).ToArray());
 
 			return dataTable;
 		}

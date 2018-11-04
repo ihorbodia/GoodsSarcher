@@ -17,29 +17,29 @@ using System.Collections.Generic;
 
 namespace GoodsSearcher.Commands
 {
-    internal class ProcessFileCommand : ICommand
-    {
-        public event EventHandler CanExecuteChanged;
-        readonly MainViewModel parent;
+	internal class ProcessFileCommand : ICommand
+	{
+		public event EventHandler CanExecuteChanged;
+		readonly MainViewModel parent;
 		FlurlClient flurlClient;
 		string merchantWordsUrl;
 		List<string> errors = new List<string>();
 		int counter = 0;
 		object lockObject = new object();
 		public ProcessFileCommand(MainViewModel parent)
-        {
-            this.parent = parent;
-            parent.PropertyChanged += delegate { CanExecuteChanged?.Invoke(this, EventArgs.Empty); };
-        }
-        public bool CanExecute(object parameter)
-        {
+		{
+			this.parent = parent;
+			parent.PropertyChanged += delegate { CanExecuteChanged?.Invoke(this, EventArgs.Empty); };
+		}
+		public bool CanExecute(object parameter)
+		{
 			return !string.IsNullOrEmpty(parent.InputFileProcessingLabelData) &&
 					!string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData) &&
 					!parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
 		}
 
-        public async void Execute(object parameter)
-        {
+		public async void Execute(object parameter)
+		{
 			string inputFileChosenPath = parent.InputFileProcessingLabelData;
 			string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
 
@@ -60,7 +60,7 @@ namespace GoodsSearcher.Commands
 				.ToList();
 
 			List<string[]> patterns = new List<string[]>();
-			
+
 
 			using (flurlClient = new FlurlClient().EnableCookies())
 			{
@@ -72,30 +72,93 @@ namespace GoodsSearcher.Commands
 					password = "qwertymns"
 				});
 
-				await DownloadMultipleTablesAsync(titles);
-			}
-
-			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
-			Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
-			try
-            {
-                await Task.Factory.StartNew(() =>
-                {
-                    
-                })
-                .ContinueWith((action) =>
+				foreach (var title in titles)
 				{
-					Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+					var items = title.Split(' ');
+					try
 					{
-						
-					}));
-				});
+						var firstTablePage = string.Empty;
+						var secondTablePage = string.Empty;
+						var thirdTablePage = string.Empty;
+						if (items.Length > 3)
+						{
+							firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
+							.WithClient(flurlClient)
+							.GetStringAsync();
+						}
+						if (items.Length > 4)
+						{
+							secondTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[2], items[3], items[4]))
+							.WithClient(flurlClient)
+							.GetStringAsync();
+						}
+						if (items.Length > 5)
+						{
+							thirdTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[3], items[4], items[5]))
+							.WithClient(flurlClient)
+							.GetStringAsync();
+						}
+
+						var firstNode = WebHelper.GetSearchResultsTable(firstTablePage);
+						var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
+							.AsEnumerable();
+						var firstPatternVolume = firstEumerable?
+							.FirstOrDefault(datarow => datarow[0].ToString()
+							.Equals($"{items[1]} {items[2]} {items[3]}".ToLower()))?
+							[2].ToString();
+
+						var secondNode = WebHelper.GetSearchResultsTable(secondTablePage);
+						var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
+							.AsEnumerable();
+						var secondPatternVolume = secondEnumerable?
+							.FirstOrDefault(datarow => datarow[0].ToString()
+							.Equals($"{items[2]} {items[3]} {items[4]}".ToLower()))?
+							[2].ToString();
+
+						var thirdNode = WebHelper.GetSearchResultsTable(thirdTablePage);
+						var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
+							.AsEnumerable();
+						var thirdPatternVolume = thirdEnumerable?
+							.FirstOrDefault(datarow => datarow[0].ToString()
+							.Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
+							[2].ToString();
+					}
+					catch (Exception ex)
+					{
+						lock (lockObject)
+						{
+							if (ex.Message.Contains("Call failed. Collection was modified; enumeration operation may not execute"))
+							{
+								errors.Add(title);
+							}
+						}
+					}
+
+					//await DownloadMultipleTablesAsync(titles);
+				}
+
+				parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+				Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+				try
+				{
+					await Task.Factory.StartNew(() =>
+					{
+
+					})
+					.ContinueWith((action) =>
+					{
+						Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+						{
+
+						}));
+					});
+				}
+				catch (Exception)
+				{
+					parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ErrorMessage;
+				}
 			}
-            catch (Exception)
-            {
-                parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ErrorMessage;
-            }
-        }
+		}
 
 		private async Task DownloadFileAsync(string title)
 		{
@@ -108,7 +171,7 @@ namespace GoodsSearcher.Commands
 				var thirdTablePage = string.Empty;
 				if (items.Length > 3)
 				{
-					firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest",items[1],items[2], items[3]))
+					firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
 					.WithClient(flurlClient)
 					.GetStringAsync();
 				}
@@ -127,6 +190,11 @@ namespace GoodsSearcher.Commands
 
 				var firstNode = WebHelper.GetSearchResultsTable(firstTablePage);
 				var firstDataTable = DataHelper.ConvertHtmlTableToDataTable(firstNode);
+				var firstPatternMaximumCount = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
+					.AsEnumerable()
+					.Where(x => x[0].ToString()
+					.Equals(title))
+					.Select(y => y[2].ToString());
 
 				var secondNode = WebHelper.GetSearchResultsTable(firstTablePage);
 				var secondDataTable = DataHelper.ConvertHtmlTableToDataTable(secondNode);
