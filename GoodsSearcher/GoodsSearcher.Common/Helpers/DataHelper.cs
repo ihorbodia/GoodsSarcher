@@ -3,7 +3,7 @@ using System.Data;
 using System.Linq;
 namespace GoodsSearcher.Common.Helpers
 {
-	public class DataHelper
+	public static class DataHelper
 	{
 		public static DataTable ConvertHtmlTableToDataTable(HtmlNode table)
 		{
@@ -21,6 +21,17 @@ namespace GoodsSearcher.Common.Helpers
 				dataTable.Rows.Add(row.SelectNodes("td").Select(td => td.InnerText.Trim().ToLower()).ToArray());
 
 			return dataTable;
+		}
+
+		public static int ToInt(this string s)
+		{
+			int i;
+			s = string.IsNullOrEmpty(s) ? string.Empty : s.Replace(",", "");
+			if (int.TryParse(s, out i))
+			{
+				return i;
+			}
+			return 0;
 		}
 	}
 }
