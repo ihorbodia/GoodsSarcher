@@ -135,7 +135,7 @@ namespace GoodsSearcher.Commands
                     {
                         Debug.WriteLine(ex.Message);
                         Debug.WriteLine(title);
-                        Debug.WriteLine();
+                        Debug.WriteLine("___________");
                     }
                 }
             }
