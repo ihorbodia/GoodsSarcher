@@ -1,10 +1,7 @@
 ﻿using Flurl.Http;
 using HtmlAgilityPack;
-using System;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 
 namespace Sraper.Common.Models
 {
@@ -19,7 +16,7 @@ namespace Sraper.Common.Models
 			.SelectSingleNode("/html[1]/body[1]/div[2]/section[1]/div[2]/div[1]/div[1]/div[2]/table[1]");
 		}
 
-        public static IFlurlClient CreateProxiedClient(string proxyUrl)
+        public static FlurlClient CreateProxiedClient(string proxyUrl)
         {
             HttpMessageHandler handler = new HttpClientHandler()
             {
@@ -29,7 +26,7 @@ namespace Sraper.Common.Models
 
             HttpClient client = new HttpClient(handler);
 
-            return new FlurlClient(client);
+			return new FlurlClient(client).EnableCookies();
         }
     }
 }
