@@ -28,7 +28,7 @@ namespace GoodsSearcher.Common.Helpers
 			return selectedFileName;
 		}
 
-		public static DataTable ConvertCSVtoDataTable(string strFilePath)
+		public static List<string> ConvertCSVtoListofTitles(string strFilePath)
 		{
 			StreamReader sr = new StreamReader(strFilePath);
 			string[] headers = sr.ReadLine().Split(',');
@@ -61,7 +61,19 @@ namespace GoodsSearcher.Common.Helpers
 				
 				dt.Rows.Add(dr);
 			}
-			return dt;
+            sr.Dispose();
+            return dt.AsEnumerable()
+                .Select(s => s.Field<string>("eBay Title")
+                .Replace('\uFFFD'.ToString(), "")
+                .Replace("[", "")
+                .Replace("]", ""))
+                .ToList(); 
 		}
+
+        public static Dictionary<string, bool> ConvertProxyFileToDictionary(string pathToProxyFile)
+        {
+            var logFile = File.ReadAllLines(pathToProxyFile);
+            return logFile.ToDictionary(key => key, value => true);
+        }
 	}
 }

@@ -13,6 +13,7 @@ using GoodsSearcher.Common.Helpers;
 using Sraper.Common.Models;
 using System.Collections.Generic;
 using System.Threading;
+using System.Diagnostics;
 
 namespace GoodsSearcher.Commands
 {
@@ -38,150 +39,113 @@ namespace GoodsSearcher.Commands
 					!parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
 		}
 
-		public async void Execute(object parameter)
-		{
-			CombinationKeys = new List<string>();
-			string inputFileChosenPath = parent.InputFileProcessingLabelData;
-			string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
+        public async void Execute(object parameter)
+        {
+            CombinationKeys = new List<string>();
+            string inputFileChosenPath = parent.InputFileProcessingLabelData;
+            string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
 
-			if (string.IsNullOrEmpty(inputFileChosenPath))
-			{
-				return;
-			}
-			inputFileChosenPath = inputFileChosenPath.Trim();
+            if (string.IsNullOrEmpty(inputFileChosenPath))
+            {
+                return;
+            }
+            inputFileChosenPath = inputFileChosenPath.Trim();
 
-			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
-			merchantWordsUrl = "https://www.merchantwords.com";
-			var titles = FilesHelper.ConvertCSVtoDataTable(inputFileChosenPath)
-				.AsEnumerable()
-				.Select(s => s.Field<string>("eBay Title")
-				.Replace('\uFFFD'.ToString(), "")
-				.Replace("[", "")
-				.Replace("]", ""))
-				.ToList();
+            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+            merchantWordsUrl = "https://www.merchantwords.com";
+            var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
 
-			List<string[]> patterns = new List<string[]>();
+            foreach (var title in titles)
+            {
+                using (flurlClient = new FlurlClient().EnableCookies())
+                {
+                    await merchantWordsUrl.AppendPathSegment("login")
+                    .WithClient(flurlClient)
+                    .PostUrlEncodedAsync(new
+                    {
+                        email = "goncalo.cabecinha@gmail.com",
+                        password = "qwertymns"
+                    });
+                    var items = title.Split(' ');
 
+                    Dictionary<string, int> combinations = new Dictionary<string, int>();
+                    try
+                    {
+                        if (items.Length > 3)
+                        {
+                            var firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-			using (flurlClient = new FlurlClient().EnableCookies())
-			{
-				
-				await DownloadMultipleTablesAsync(titles);
+                            var firstNode = WebHelper.GetSearchResultsTable(firstTablePage);
+                            var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
+                                .AsEnumerable();
+                            var firstVolumeString = firstEumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[1]} {items[2]} {items[3]}".ToLower()))?
+                                [2].ToString();
 
-				ThreadPool.SetMinThreads(20, 1);
-				ThreadPool.SetMaxThreads(20, 1);
-				for (int i = 0; i < CombinationKeys.Count; i++)
-				{
-					ThreadPool.QueueUserWorkItem(delegate (object param)
-					{
-						string combination = param as string;
-						Console.WriteLine(combination);
-					}, CombinationKeys[i]);
-				}
+                            combinations.Add($"{items[1]} {items[2]} {items[3]}", DataHelper.ToInt(firstVolumeString));
+                        }
+                        if (items.Length > 4)
+                        {
+                            var secondTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[2], items[3], items[4]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-				parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
-				Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
-				try
-				{
-					await Task.Factory.StartNew(() =>
-					{
+                            var secondNode = WebHelper.GetSearchResultsTable(secondTablePage);
+                            var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
+                                .AsEnumerable();
+                            var stringSecondVolume = secondEnumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[2]} {items[3]} {items[4]}".ToLower()))?
+                                [2].ToString();
 
-					})
-					.ContinueWith((action) =>
-					{
-						Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
-						{
+                            combinations.Add($"{items[2]} {items[3]} {items[4]}", DataHelper.ToInt(stringSecondVolume));
+                        }
+                        if (items.Length > 6)
+                        {
+                            var thirdTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[3], items[4], items[5]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-						}));
-					});
-				}
-				catch (Exception)
-				{
-					parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ErrorMessage;
-				}
-			}
-		}
+                            var thirdNode = WebHelper.GetSearchResultsTable(thirdTablePage);
+                            var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
+                                .AsEnumerable();
+                            var thirdVolumeString = thirdEnumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
+                                [2].ToString();
+
+                            combinations.Add($"{items[4]} {items[5]} {items[6]}", DataHelper.ToInt(thirdVolumeString));
+                        }
+
+                        string maxCombinationKey = string.Empty;
+                        if (combinations.Any())
+                        {
+                            maxCombinationKey = combinations.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
+                        }
+                        else
+                        {
+                            return;
+                        }
+                        CombinationKeys.Add(maxCombinationKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        Debug.WriteLine(title);
+                        Debug.WriteLine();
+                    }
+                }
+            }
+            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+            Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+        }
 
 		private async Task DownloadFileAsync(string title)
 		{
-			var items = title.Split(' ');
-
-			Dictionary<string, int> combinations = new Dictionary<string, int>();
-			try
-			{
-				if (items.Length > 3)
-				{
-					var firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
-					.WithClient(flurlClient)
-					.GetStringAsync();
-
-					var firstNode = WebHelper.GetSearchResultsTable(firstTablePage);
-					var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
-						.AsEnumerable();
-					var firstVolumeString = firstEumerable?
-						.FirstOrDefault(datarow => datarow[0].ToString()
-						.Equals($"{items[1]} {items[2]} {items[3]}".ToLower()))?
-						[2].ToString();
-
-					combinations.Add($"{items[1]} {items[2]} {items[3]}", DataHelper.ToInt(firstVolumeString));
-				}
-				if (items.Length > 4)
-				{
-					var secondTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[2], items[3], items[4]))
-					.WithClient(flurlClient)
-					.GetStringAsync();
-
-					var secondNode = WebHelper.GetSearchResultsTable(secondTablePage);
-					var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
-						.AsEnumerable();
-					var stringSecondVolume = secondEnumerable?
-						.FirstOrDefault(datarow => datarow[0].ToString()
-						.Equals($"{items[2]} {items[3]} {items[4]}".ToLower()))?
-						[2].ToString();
-
-					combinations.Add($"{items[2]} {items[3]} {items[4]}", DataHelper.ToInt(stringSecondVolume));
-				}
-				if (items.Length > 6)
-				{
-					var thirdTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[3], items[4], items[5]))
-					.WithClient(flurlClient)
-					.GetStringAsync();
-
-					var thirdNode = WebHelper.GetSearchResultsTable(thirdTablePage);
-					var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
-						.AsEnumerable();
-					var thirdVolumeString = thirdEnumerable?
-						.FirstOrDefault(datarow => datarow[0].ToString()
-						.Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
-						[2].ToString();
-
-					combinations.Add($"{items[4]} {items[5]} {items[6]}", DataHelper.ToInt(thirdVolumeString));
-				}
-
-				string maxCombinationKey = string.Empty;
-				if (combinations.Any())
-				{
-					maxCombinationKey = combinations.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
-				}
-				else
-				{
-					return;
-				}
-				lock (lockObject)
-				{
-					CombinationKeys.Add(maxCombinationKey);
-				}
-			}
-			catch (Exception ex)
-			{
-				lock (lockObject)
-				{
-					if (ex.Message.Contains("Call failed. Collection was modified; enumeration operation may not execute"))
-					{
-						errors.Add(title);
-					}
-				}
-			}
+			
 		}
 
 		private async Task DownloadMultipleTablesAsync(List<string> titles)
