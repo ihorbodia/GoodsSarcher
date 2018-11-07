@@ -1,4 +1,5 @@
 ﻿using HtmlAgilityPack;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 namespace GoodsSearcher.Common.Helpers
@@ -32,6 +33,21 @@ namespace GoodsSearcher.Common.Helpers
 				return i;
 			}
 			return 0;
+		}
+
+		public static IEnumerable<string> GetHrefsFromHtmlList(HtmlNode table)
+		{
+			if (table == null)
+			{
+				return null;
+			}
+			var list = table.ChildNodes
+				.Select(x => x.Descendants("h3").FirstOrDefault())
+				.Where(x => x != null)
+				.SelectMany(x => x.ChildNodes)
+				.Where(x => x.Name.Equals("a"))
+				.Select(y => y.Attributes["href"].Value);
+			return list;
 		}
 	}
 }

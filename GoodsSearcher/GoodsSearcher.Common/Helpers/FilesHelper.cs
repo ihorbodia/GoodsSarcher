@@ -67,10 +67,10 @@ namespace GoodsSearcher.Common.Helpers
                 .ToList(); 
 		}
 
-        public static Dictionary<string, bool> ConvertProxyFileToDictionary(string pathToProxyFile)
+        public static Dictionary<string, int> ConvertProxyFileToDictionary(string pathToProxyFile)
         {
             var logFile = File.ReadAllLines(pathToProxyFile);
-            return logFile.ToDictionary(key => key, value => true);
+            return logFile.ToDictionary(key => key, value => 0);
         }
 	}
 }

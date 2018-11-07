@@ -24,8 +24,8 @@ namespace GoodsSearcher.Commands
 		readonly MainViewModel parent;
 		FlurlClient flurlClient;
 		readonly string merchantWordsUrl = "https://www.merchantwords.com";
-		readonly string amazonPageUrl = "https://www.amazon.co.uk/";
-		Dictionary<string, bool> proxies;
+		readonly string amazonPageUrl = "https://www.ebay.co.uk/";
+		Dictionary<string, int> proxies;
 		int counter = 0;
 		object lockObject = new object();
 		List<string> combinationKeys;
@@ -45,7 +45,7 @@ namespace GoodsSearcher.Commands
         public async void Execute(object parameter)
         {
             combinationKeys = new List<string>();
-			proxies = new Dictionary<string, bool>();
+			proxies = new Dictionary<string, int>();
 
 			string inputFileChosenPath = parent.InputFileProcessingLabelData;
             string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
@@ -61,14 +61,14 @@ namespace GoodsSearcher.Commands
 			
             var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
 			proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
-			await scrapeDataFromMerchantWord(titles);
+			//await scrapeDataFromMerchantWord(titles);
 
-			foreach (var key in combinationKeys)
-			{
-				await DoWork(key);
-			}
-			//Task t = ParallelQueue(combinationKeys, DoWork);
 
+			DoWork("");
+			//foreach (var key in combinationKeys) //Temporary sync solution TODO: Async
+			//{
+			//	await DoWork(key);
+			//}
 
 			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
             Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
@@ -94,27 +94,60 @@ namespace GoodsSearcher.Commands
 			}
 		}
 
-		private async Task DoWork(string item)
+		private async Task DoWork(string combination)
 		{
-			var items = item.Split(' ');
-			foreach (var proxy in proxies)
+			//var items = combination.Split(' ');
+			string[] items = { "back", "one", "two", "three" };
+			foreach (var proxy in proxies.Keys.ToList())
 			{
-				var proxiedCLient = WebHelper.CreateProxiedClient(proxy.Key);
+				//var proxiedCLient = WebHelper.CreateProxiedClient(proxy.Key);
+				var proxiedCLient = WebHelper.CreateClient();
 				try
 				{
-					await amazonPageUrl.WithClient(proxiedCLient).GetAsync();
-					var page = await amazonPageUrl
-						.AppendPathSegment(string.Format("s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords={0}+{1}+{2}", items[1], items[2], items[3]))
-						.WithClient(flurlClient)
-						.GetStringAsync();
+					bool continueWork = false;
+					int pageNumber = 1;
+					do
+					{
+						var str = await amazonPageUrl.WithClient(proxiedCLient).GetStringAsync();
+						var url = amazonPageUrl
+							.AppendPathSegment("sch")
+							.AppendPathSegment("i.html")
+							.SetQueryParam("_nkw", $"{items[0]}+{items[1]}+{items[2]}_pgn={pageNumber}&_skc=50&rt=nc");
+						var page = await url.WithClient(proxiedCLient)
+							.GetStringAsync();
+						var table = WebHelper.GetSearchEbayResultsTable(page);
+						var itemsOnPage = DataHelper.GetHrefsFromHtmlList(table);
+						foreach (var itemUrl in itemsOnPage)
+						{
+							/*Process every item on page*/
+							string result = await scrapDataFromItemPage(itemUrl, proxiedCLient);
+							if (!string.IsNullOrEmpty(result))
+							{
+								continueWork = false;
+							}
+						}
+
+					} while (continueWork);
+					
 				}
-				catch (FlurlHttpException ex)
+				catch (Exception ex)
 				{
-
+					lock(lockObject)
+					{
+						proxies[proxy]++;
+					}
 				}
-	
-
 			}
+		}
+
+		private async Task<string> scrapDataFromItemPage(string itemPageUrl, FlurlClient client)
+		{
+			string result = string.Empty;
+
+			var str = await itemPageUrl.WithClient(client).GetStringAsync();
+
+
+			return result;
 		}
 
 		private async Task scrapeDataFromMerchantWord(List<string> titles)
@@ -141,7 +174,7 @@ namespace GoodsSearcher.Commands
 							.WithClient(flurlClient)
 							.GetStringAsync();
 
-							var firstNode = WebHelper.GetSearchResultsTable(firstTablePage);
+							var firstNode = WebHelper.GetSearchMerchantWordsResultsTable(firstTablePage);
 							var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
 								.AsEnumerable();
 							var firstVolumeString = firstEumerable?
@@ -157,7 +190,7 @@ namespace GoodsSearcher.Commands
 							.WithClient(flurlClient)
 							.GetStringAsync();
 
-							var secondNode = WebHelper.GetSearchResultsTable(secondTablePage);
+							var secondNode = WebHelper.GetSearchMerchantWordsResultsTable(secondTablePage);
 							var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
 								.AsEnumerable();
 							var stringSecondVolume = secondEnumerable?
@@ -173,7 +206,7 @@ namespace GoodsSearcher.Commands
 							.WithClient(flurlClient)
 							.GetStringAsync();
 
-							var thirdNode = WebHelper.GetSearchResultsTable(thirdTablePage);
+							var thirdNode = WebHelper.GetSearchMerchantWordsResultsTable(thirdTablePage);
 							var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
 								.AsEnumerable();
 							var thirdVolumeString = thirdEnumerable?
@@ -204,16 +237,5 @@ namespace GoodsSearcher.Commands
 				}
 			}
 		}
-		//private async Task DownloadMultipleTablesAsync(List<string> titles)
-		//{
-		//	//counter++;
-		//	//await Task.WhenAll(titles.Select(title => DownloadFileAsync(title)));
-		//	//if (errors.Any() && counter < 10)
-		//	//{
-		//	//	List<string> items = new List<string>(errors);
-		//	//	errors.Clear();
-		//	//	await DownloadMultipleTablesAsync(items);
-		//	//}
-		//}
 	}
 }
