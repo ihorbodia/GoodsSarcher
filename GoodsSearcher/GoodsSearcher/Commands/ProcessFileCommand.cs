@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
 using GoodsSearcher.ViewModels;
 using Sraper.Common;
 using Flurl;
@@ -14,7 +12,7 @@ using Sraper.Common.Models;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
-using System.Net.Sockets;
+using GoodsSearcher.Common.Models;
 
 namespace GoodsSearcher.Commands
 {
@@ -22,13 +20,12 @@ namespace GoodsSearcher.Commands
 	{
 		public event EventHandler CanExecuteChanged;
 		readonly MainViewModel parent;
-		FlurlClient flurlClient;
 		readonly string merchantWordsUrl = "https://www.merchantwords.com";
-		readonly string amazonPageUrl = "https://www.ebay.co.uk/";
 		Dictionary<string, int> proxies;
 		int counter = 0;
 		object lockObject = new object();
 		List<string> combinationKeys;
+        List<AmazonItem> resultList;
 		public ProcessFileCommand(MainViewModel parent)
 		{
 			this.parent = parent;
@@ -61,16 +58,25 @@ namespace GoodsSearcher.Commands
 			
             var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
 			proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
-			//await scrapeDataFromMerchantWord(titles);
 
+            List<Task> TaskList = new List<Task>();
+            foreach (var title in titles)
+            {
+                var LastTask = new Task(() =>
+                {
+                    scrapeDataFromMerchantWord(title);
+                });
+                LastTask.Start();
+                TaskList.Add(LastTask);
+            }
+            Task.WaitAll(TaskList.ToArray());
 
-			DoWork("");
-			//foreach (var key in combinationKeys) //Temporary sync solution TODO: Async
-			//{
-			//	await DoWork(key);
-			//}
+            foreach (var key in combinationKeys)
+            {
+                SearchItem(key);
+            }
 
-			parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
             Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
         }
 
@@ -94,147 +100,135 @@ namespace GoodsSearcher.Commands
 			}
 		}
 
-		private async Task DoWork(string combination)
+        private async void SearchItem(string combination)
+        {
+            FlurlClient proxiedClient = null;
+            foreach (var proxy in proxies.Keys.ToList())
+            {
+                proxiedClient = WebHelper.CreateProxiedClient(proxy);
+                try
+                {
+                    await WebHelper.amazonPageUrl.WithClient(proxiedClient).WithTimeout(2).GetStringAsync();
+                }
+                catch (Exception)
+                {
+                    lock (lockObject)
+                    {
+                        proxies[proxy]++;
+                    }
+                }
+            }
+
+            bool continueWork = true;
+            int pageNumber = 1;
+            do
+            {
+                var url = WebHelper.CreateUrlToPageResults(combination, pageNumber);
+                var page = await url.WithClient(proxiedClient)
+                    .GetStringAsync();
+                var itemsOnPage = WebHelper.GetSearchAmazonResults(page);
+                foreach (var item in itemsOnPage)
+                {
+                    var readyItem = item.InitPrice(proxiedClient);
+                    if (readyItem != null)
+                    {
+                        lock (lockObject)
+                        {
+                            resultList.Add(readyItem);
+                        }
+                        continueWork = false;
+                        break;
+                    }
+                }
+                pageNumber++;
+            } while (continueWork);
+        }
+
+        
+
+        private void scrapeDataFromMerchantWord(string title)
 		{
-			//var items = combination.Split(' ');
-			string[] items = { "back", "one", "two", "three" };
-			foreach (var proxy in proxies.Keys.ToList())
-			{
-				//var proxiedCLient = WebHelper.CreateProxiedClient(proxy.Key);
-				var proxiedCLient = WebHelper.CreateClient();
-				try
-				{
-					bool continueWork = false;
-					int pageNumber = 1;
-					do
-					{
-						var str = await amazonPageUrl.WithClient(proxiedCLient).GetStringAsync();
-						var url = amazonPageUrl
-							.AppendPathSegment("sch")
-							.AppendPathSegment("i.html")
-							.SetQueryParam("_nkw", $"{items[0]}+{items[1]}+{items[2]}_pgn={pageNumber}&_skc=50&rt=nc");
-						var page = await url.WithClient(proxiedCLient)
-							.GetStringAsync();
-						var table = WebHelper.GetSearchEbayResultsTable(page);
-						var itemsOnPage = DataHelper.GetHrefsFromHtmlList(table);
-						foreach (var itemUrl in itemsOnPage)
-						{
-							/*Process every item on page*/
-							string result = await scrapDataFromItemPage(itemUrl, proxiedCLient);
-							if (!string.IsNullOrEmpty(result))
-							{
-								continueWork = false;
-							}
-						}
+                FlurlClient flurlClient;
+                using (flurlClient = new FlurlClient().EnableCookies())
+                {
+                    merchantWordsUrl.AppendPathSegment("login")
+                    .WithClient(flurlClient)
+                    .PostUrlEncodedAsync(new
+                    {
+                        email = "goncalo.cabecinha@gmail.com",
+                        password = "qwertymns"
+                    });
+                    var items = title.Split(' ');
+                    Dictionary<string, int> combinations = new Dictionary<string, int>();
+                    try
+                    {
+                        if (items.Length > 3)
+                        {
+                            var firstTablePage = merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-					} while (continueWork);
-					
-				}
-				catch (Exception ex)
-				{
-					lock(lockObject)
-					{
-						proxies[proxy]++;
-					}
-				}
-			}
-		}
+                            var firstNode = WebHelper.GetSearchMerchantWordsResultsTable(firstTablePage.Result);
+                            var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
+                                .AsEnumerable();
+                            var firstVolumeString = firstEumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[1]} {items[2]} {items[3]}".ToLower()))?
+                                [2].ToString();
 
-		private async Task<string> scrapDataFromItemPage(string itemPageUrl, FlurlClient client)
-		{
-			string result = string.Empty;
+                            combinations.Add($"{items[1]} {items[2]} {items[3]}", DataHelper.ToInt(firstVolumeString));
+                        }
+                        if (items.Length > 4)
+                        {
+                            var secondTablePage = merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[2], items[3], items[4]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-			var str = await itemPageUrl.WithClient(client).GetStringAsync();
+                            var secondNode = WebHelper.GetSearchMerchantWordsResultsTable(secondTablePage.Result);
+                            var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
+                                .AsEnumerable();
+                            var stringSecondVolume = secondEnumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[2]} {items[3]} {items[4]}".ToLower()))?
+                                [2].ToString();
 
+                            combinations.Add($"{items[2]} {items[3]} {items[4]}", DataHelper.ToInt(stringSecondVolume));
+                        }
+                        if (items.Length > 6)
+                        {
+                            var thirdTablePage = merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[3], items[4], items[5]))
+                            .WithClient(flurlClient)
+                            .GetStringAsync();
 
-			return result;
-		}
+                            var thirdNode = WebHelper.GetSearchMerchantWordsResultsTable(thirdTablePage.Result);
+                            var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
+                                .AsEnumerable();
+                            var thirdVolumeString = thirdEnumerable?
+                                .FirstOrDefault(datarow => datarow[0].ToString()
+                                .Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
+                                [2].ToString();
 
-		private async Task scrapeDataFromMerchantWord(List<string> titles)
-		{
-			foreach (var title in titles)
-			{
-				using (flurlClient = new FlurlClient().EnableCookies())
-				{
-					await merchantWordsUrl.AppendPathSegment("login")
-					.WithClient(flurlClient)
-					.PostUrlEncodedAsync(new
-					{
-						email = "goncalo.cabecinha@gmail.com",
-						password = "qwertymns"
-					});
-					var items = title.Split(' ');
+                            combinations.Add($"{items[4]} {items[5]} {items[6]}", DataHelper.ToInt(thirdVolumeString));
+                        }
 
-					Dictionary<string, int> combinations = new Dictionary<string, int>();
-					try
-					{
-						if (items.Length > 3)
-						{
-							var firstTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
-							.WithClient(flurlClient)
-							.GetStringAsync();
-
-							var firstNode = WebHelper.GetSearchMerchantWordsResultsTable(firstTablePage);
-							var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
-								.AsEnumerable();
-							var firstVolumeString = firstEumerable?
-								.FirstOrDefault(datarow => datarow[0].ToString()
-								.Equals($"{items[1]} {items[2]} {items[3]}".ToLower()))?
-								[2].ToString();
-
-							combinations.Add($"{items[1]} {items[2]} {items[3]}", DataHelper.ToInt(firstVolumeString));
-						}
-						if (items.Length > 4)
-						{
-							var secondTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[2], items[3], items[4]))
-							.WithClient(flurlClient)
-							.GetStringAsync();
-
-							var secondNode = WebHelper.GetSearchMerchantWordsResultsTable(secondTablePage);
-							var secondEnumerable = DataHelper.ConvertHtmlTableToDataTable(secondNode)?
-								.AsEnumerable();
-							var stringSecondVolume = secondEnumerable?
-								.FirstOrDefault(datarow => datarow[0].ToString()
-								.Equals($"{items[2]} {items[3]} {items[4]}".ToLower()))?
-								[2].ToString();
-
-							combinations.Add($"{items[2]} {items[3]} {items[4]}", DataHelper.ToInt(stringSecondVolume));
-						}
-						if (items.Length > 6)
-						{
-							var thirdTablePage = await merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[3], items[4], items[5]))
-							.WithClient(flurlClient)
-							.GetStringAsync();
-
-							var thirdNode = WebHelper.GetSearchMerchantWordsResultsTable(thirdTablePage);
-							var thirdEnumerable = DataHelper.ConvertHtmlTableToDataTable(thirdNode)?
-								.AsEnumerable();
-							var thirdVolumeString = thirdEnumerable?
-								.FirstOrDefault(datarow => datarow[0].ToString()
-								.Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
-								[2].ToString();
-
-							combinations.Add($"{items[4]} {items[5]} {items[6]}", DataHelper.ToInt(thirdVolumeString));
-						}
-
-						string maxCombinationKey = string.Empty;
-						if (combinations.Any())
-						{
-							maxCombinationKey = combinations.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
-						}
-						else
-						{
-							return;
-						}
-						combinationKeys.Add(maxCombinationKey);
-					}
-					catch (Exception ex)
-					{
-						Debug.WriteLine(ex.Message);
-						Debug.WriteLine(title);
-						Debug.WriteLine("___________");
-					}
-				}
+                        string maxCombinationKey = string.Empty;
+                        if (combinations.Any())
+                        {
+                            maxCombinationKey = combinations.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
+                        }
+                        else
+                        {
+                            return;
+                        }
+                        combinationKeys.Add(maxCombinationKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        Debug.WriteLine(title);
+                        Debug.WriteLine("___________");
+                    }
+                
 			}
 		}
 	}

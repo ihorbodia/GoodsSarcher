@@ -38,7 +38,7 @@ namespace GoodsSearcher.Common.Helpers
 			string previousRow = null;
 			while (!sr.EndOfStream)
 			{
-				var currentRow = sr.ReadLine();
+                var currentRow = sr.ReadLine().Replace("\"", "");
 				if (currentRow.StartsWith(tab) && !string.IsNullOrEmpty(previousRow))
 				{
 					currentRow = currentRow.Replace(tab, " ");
