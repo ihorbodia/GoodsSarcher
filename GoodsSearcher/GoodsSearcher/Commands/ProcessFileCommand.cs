@@ -21,11 +21,11 @@ namespace GoodsSearcher.Commands
 		public event EventHandler CanExecuteChanged;
 		readonly MainViewModel parent;
 		readonly string merchantWordsUrl = "https://www.merchantwords.com";
-		Dictionary<string, int> proxies;
+		static Dictionary<string, int> proxies;
 		int counter = 0;
-		object lockObject = new object();
+        static readonly object lockObject = new object();
 		List<string> combinationKeys;
-        List<AmazonItem> resultList;
+        static List<AmazonItem> resultList;
 		public ProcessFileCommand(MainViewModel parent)
 		{
 			this.parent = parent;
@@ -71,18 +71,20 @@ namespace GoodsSearcher.Commands
             }
             Task.WaitAll(TaskList.ToArray());
 
-            foreach (var key in combinationKeys)
-            {
-                SearchItem(key);
-            }
+            var proxiesList = proxies.Keys.ToList();
+            await ParallelQueue(combinationKeys, proxiesList, SearchItem);
+            //foreach (var key in combinationKeys)
+            //{
+            //    SearchItem(key, proxiesList);
+            //}
 
             parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
             Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
         }
 
-		private static async Task ParallelQueue<T>(List<T> items, Func<T, Task> func)
+		private static async Task ParallelQueue<T>(List<T> combinations, List<T> proxies, Func<T,List<T>, Task> func)
 		{
-			Queue pending = new Queue(items);
+			Queue pending = new Queue(combinations);
 			List<Task> working = new List<Task>();
 
 			while (pending.Count + working.Count != 0)
@@ -90,7 +92,7 @@ namespace GoodsSearcher.Commands
 				if (working.Count < 20 && pending.Count != 0)
 				{
 					var item = pending.Dequeue();
-					working.Add(Task.Factory.StartNew(async () => await func((T)item)));
+					working.Add(Task.Factory.StartNew(async () => await func((T)item, proxies)));
 				}
 				else
 				{
@@ -100,10 +102,10 @@ namespace GoodsSearcher.Commands
 			}
 		}
 
-        private async void SearchItem(string combination)
+        private static async Task SearchItem(string combination, IEnumerable<string> proxiesList)
         {
             FlurlClient proxiedClient = null;
-            foreach (var proxy in proxies.Keys.ToList())
+            foreach (var proxy in proxiesList)
             {
                 proxiedClient = WebHelper.CreateProxiedClient(proxy);
                 try
@@ -124,8 +126,7 @@ namespace GoodsSearcher.Commands
             do
             {
                 var url = WebHelper.CreateUrlToPageResults(combination, pageNumber);
-                var page = await url.WithClient(proxiedClient)
-                    .GetStringAsync();
+                var page = url.WithClient(proxiedClient).GetStringAsync().GetAwaiter().GetResult();
                 var itemsOnPage = WebHelper.GetSearchAmazonResults(page);
                 foreach (var item in itemsOnPage)
                 {
@@ -143,8 +144,6 @@ namespace GoodsSearcher.Commands
                 pageNumber++;
             } while (continueWork);
         }
-
-        
 
         private void scrapeDataFromMerchantWord(string title)
 		{
