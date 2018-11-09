@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
 using GoodsSearcher.Common.Models;
+using System.Collections.Concurrent;
 
 namespace GoodsSearcher.Commands
 {
@@ -21,12 +22,13 @@ namespace GoodsSearcher.Commands
 		public event EventHandler CanExecuteChanged;
 		readonly MainViewModel parent;
 		readonly string merchantWordsUrl = "https://www.merchantwords.com";
-		static Dictionary<string, int> proxies;
-		int counter = 0;
         static readonly object lockObject = new object();
 		List<string> combinationKeys;
-        static List<AmazonItem> resultList;
-		public ProcessFileCommand(MainViewModel parent)
+        static readonly Random rnd = new Random();
+        static ConcurrentBag<AmazonItem> resultList = new ConcurrentBag<AmazonItem>();
+        static ConcurrentDictionary<string, int> proxies;
+
+        public ProcessFileCommand(MainViewModel parent)
 		{
 			this.parent = parent;
 			parent.PropertyChanged += delegate { CanExecuteChanged?.Invoke(this, EventArgs.Empty); };
@@ -39,12 +41,11 @@ namespace GoodsSearcher.Commands
 					!parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
 		}
 
-        public async void Execute(object parameter)
+        public void Execute(object parameter)
         {
             combinationKeys = new List<string>();
-			proxies = new Dictionary<string, int>();
 
-			string inputFileChosenPath = parent.InputFileProcessingLabelData;
+            string inputFileChosenPath = parent.InputFileProcessingLabelData;
             string proxiesFileChosenPath = parent.ProxiesFileProcessingLabelData;
 
             if (string.IsNullOrEmpty(inputFileChosenPath))
@@ -55,34 +56,39 @@ namespace GoodsSearcher.Commands
 
             parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
 
-			
             var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
 			proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
-
-            List<Task> TaskList = new List<Task>();
-            foreach (var title in titles)
+            
+            Task.Factory.StartNew(() =>
             {
-                var LastTask = new Task(() =>
+                List<Task> TaskList = new List<Task>();
+                foreach (var title in titles)
                 {
-                    scrapeDataFromMerchantWord(title);
-                });
-                LastTask.Start();
-                TaskList.Add(LastTask);
-            }
-            Task.WaitAll(TaskList.ToArray());
+                    var LastTask = new Task(() =>
+                    {
+                        scrapeDataFromMerchantWord(title);
+                    });
+                    LastTask.Start();
+                    TaskList.Add(LastTask);
+                }
+                Task.WaitAll(TaskList.ToArray());
 
-            var proxiesList = proxies.Keys.ToList();
-            await ParallelQueue(combinationKeys, proxiesList, SearchItem);
-            //foreach (var key in combinationKeys)
-            //{
-            //    SearchItem(key, proxiesList);
-            //}
-
-            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
-            Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+            }).ContinueWith(async (action) =>
+            {
+                await ParallelQueue(combinationKeys, SearchItem);
+               
+            }).ContinueWith((action) =>
+            {
+                /*Save file to disk*/
+            })
+            .ContinueWith((action) =>
+            {
+                parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+                Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+            });
         }
 
-		private static async Task ParallelQueue<T>(List<T> combinations, List<T> proxies, Func<T,List<T>, Task> func)
+		private static async Task ParallelQueue<T>(List<T> combinations, Func<T, Task> func)
 		{
 			Queue pending = new Queue(combinations);
 			List<Task> working = new List<Task>();
@@ -92,7 +98,7 @@ namespace GoodsSearcher.Commands
 				if (working.Count < 20 && pending.Count != 0)
 				{
 					var item = pending.Dequeue();
-					working.Add(Task.Factory.StartNew(async () => await func((T)item, proxies)));
+                    working.Add(Task.Factory.StartNew(() => func((T)item)));
 				}
 				else
 				{
@@ -102,24 +108,42 @@ namespace GoodsSearcher.Commands
 			}
 		}
 
-        private static async Task SearchItem(string combination, IEnumerable<string> proxiesList)
+        private static string getProxyAddress()
+        {
+            var itemsToRemove = proxies.Where(x => x.Value > 2);
+            foreach (var item in itemsToRemove)
+            {
+                proxies.TryRemove(item.Key, out int value);
+            }
+            int r = rnd.Next(proxies.Count);
+            return proxies.ElementAt(r).Key;
+        }
+
+        private static async Task SearchItem(string combination)
         {
             FlurlClient proxiedClient = null;
-            foreach (var proxy in proxiesList)
+            string correctProxy = string.Empty;
+            bool connectionAccepted = false;
+            do
             {
-                proxiedClient = WebHelper.CreateProxiedClient(proxy);
+                correctProxy = getProxyAddress();
+                if (correctProxy == null)
+                {
+                    return;
+                }
+                proxiedClient = WebHelper.CreateProxiedClient(correctProxy);
+
                 try
                 {
-                    await WebHelper.amazonPageUrl.WithClient(proxiedClient).WithTimeout(2).GetStringAsync();
+                    WebHelper.amazonPageUrl.WithClient(proxiedClient).WithTimeout(2).GetStringAsync().GetAwaiter().GetResult();
+                    connectionAccepted = true;
                 }
-                catch (Exception)
+                catch (FlurlHttpException ex)
                 {
-                    lock (lockObject)
-                    {
-                        proxies[proxy]++;
-                    }
+                    proxies.TryRemove(correctProxy, out int value);
+                    Debug.WriteLine(proxies.Count);
                 }
-            }
+            } while (!connectionAccepted);
 
             bool continueWork = true;
             int pageNumber = 1;

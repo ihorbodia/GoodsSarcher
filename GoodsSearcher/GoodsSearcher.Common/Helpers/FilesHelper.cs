@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
@@ -67,10 +68,10 @@ namespace GoodsSearcher.Common.Helpers
                 .ToList(); 
 		}
 
-        public static Dictionary<string, int> ConvertProxyFileToDictionary(string pathToProxyFile)
+        public static ConcurrentDictionary<string, int> ConvertProxyFileToDictionary(string pathToProxyFile)
         {
             var logFile = File.ReadAllLines(pathToProxyFile);
-            return logFile.ToDictionary(key => key, value => 0);
+            return new ConcurrentDictionary<string, int>(logFile.ToDictionary(key => key, value => 0));
         }
 	}
 }
