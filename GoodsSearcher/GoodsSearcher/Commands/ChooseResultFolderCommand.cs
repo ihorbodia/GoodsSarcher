@@ -2,15 +2,19 @@
 using GoodsSearcher.ViewModels;
 using Sraper.Common;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace GoodsSearcher.Commands
 {
-    internal class ChooseInputFileCommand : ICommand
+    internal class ChooseResultFolderCommand : ICommand
     {
         public event EventHandler CanExecuteChanged;
         readonly MainViewModel parent;
-        public ChooseInputFileCommand(MainViewModel parent)
+        public ChooseResultFolderCommand(MainViewModel parent)
         {
             this.parent = parent;
             parent.PropertyChanged += delegate { CanExecuteChanged?.Invoke(this, EventArgs.Empty); };
@@ -22,17 +26,17 @@ namespace GoodsSearcher.Commands
 
         public void Execute(object parameter)
         {
-            string inputFileChoosePath = FilesHelper.SelectFile();
-            if (!string.IsNullOrEmpty(inputFileChoosePath.Trim()))
+            string chosenResultFolderPath = FilesHelper.SelectFolder();
+            if (!string.IsNullOrEmpty(chosenResultFolderPath.Trim()))
             {
-                parent.InputFileProcessingLabelData = inputFileChoosePath;
-                if (!string.IsNullOrEmpty(parent.InputFileProcessingLabelData) && !string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData))
+                parent.ResultFolderLabelData = chosenResultFolderPath;
+                if (!string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData) && !string.IsNullOrEmpty(parent.InputFileProcessingLabelData))
                 {
                     parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_CanProcess;
                 }
-                if (string.IsNullOrEmpty(parent.InputFileProcessingLabel))
+                if (string.IsNullOrEmpty(parent.InputFileProcessingLabelData))
                 {
-                    parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ChooseProxyFile;
+                    parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ChooseInputFile;
                 }
                 if (string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData))
                 {

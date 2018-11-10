@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoodsSearcher", "GoodsSearc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoodsSearcher.Common", "GoodsSearcher.Common\GoodsSearcher.Common.csproj", "{4DA55566-92D9-4075-B102-E638101A3C38}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoodsSearcher.Logic", "GoodsSearcher.Logic\GoodsSearcher.Logic.csproj", "{1E7F0D75-0130-4C2E-9A9B-2CD57D725FE9}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,10 +21,6 @@ Global
 		{4DA55566-92D9-4075-B102-E638101A3C38}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4DA55566-92D9-4075-B102-E638101A3C38}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4DA55566-92D9-4075-B102-E638101A3C38}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1E7F0D75-0130-4C2E-9A9B-2CD57D725FE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1E7F0D75-0130-4C2E-9A9B-2CD57D725FE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1E7F0D75-0130-4C2E-9A9B-2CD57D725FE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1E7F0D75-0130-4C2E-9A9B-2CD57D725FE9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

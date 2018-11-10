@@ -57,9 +57,10 @@
     <Compile Include="Helpers\DataHelper.cs" />
     <Compile Include="Helpers\FilesHelper.cs" />
     <Compile Include="Helpers\StringConsts.cs" />
+    <Compile Include="Helpers\CustomTaskFactory.cs" />
     <Compile Include="Helpers\WebHelper.cs" />
     <Compile Include="Models\AmazonItem.cs" />
-    <Compile Include="Models\ProxyItem.cs" />
+    <Compile Include="Models\TaskItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

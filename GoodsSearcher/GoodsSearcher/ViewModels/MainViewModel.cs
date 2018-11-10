@@ -18,20 +18,57 @@ namespace GoodsSearcher.ViewModels
         private string _proxiesFileProcessingLabel;
         private string _proxiesFileProcessingLabelData;
 
+        private string _resultFolderLabel;
+        private string _resultFolderLabelData;
+
         public MainViewModel()
         {
             ProcessFileCommand = new ProcessFileCommand(this);
             ChooseInputFileCommand = new ChooseInputFileCommand(this);
             ChooseProxiesFileCommand = new ChooseProxiesFileCommand(this);
+            ChooseResultFolderCommand = new ChooseResultFolderCommand(this);
             InputFileProcessingLabel = StringConsts.InputFilePathLabel;
             ProxiesFileProcessingLabel = StringConsts.ProxyFilePathLabel;
             FileProcessingLabel = StringConsts.FileProcessingLabelConst;
+            ResultFolderLabel = StringConsts.FileProcessingLabelData_Choose_folder;
             FileProcessingLabelData = string.Empty;
         }
 
         public ICommand ProcessFileCommand { get; private set; }
         public ICommand ChooseInputFileCommand { get; private set; }
         public ICommand ChooseProxiesFileCommand { get; private set; }
+        public ICommand ChooseResultFolderCommand { get; private set; }
+
+        public string ResultFolderLabel
+        {
+            get
+            {
+                return _resultFolderLabel;
+            }
+            private set
+            {
+                if (_resultFolderLabel != value)
+                {
+                    _resultFolderLabel = value;
+                    RaisePropertyChanged(nameof(ResultFolderLabel));
+                }
+            }
+        }
+        public string ResultFolderLabelData
+        {
+            get
+            {
+                return _resultFolderLabelData;
+            }
+            set
+            {
+                if (_resultFolderLabelData != value)
+                {
+                    _resultFolderLabelData = value;
+                    RaisePropertyChanged(nameof(ResultFolderLabelData));
+                }
+            }
+        }
 
         public string InputFileProcessingLabel
         {

@@ -12,21 +12,19 @@ using Sraper.Common.Models;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
-using GoodsSearcher.Common.Models;
-using System.Collections.Concurrent;
+using System.Text;
+using System.IO;
+using System.Windows.Threading;
 
 namespace GoodsSearcher.Commands
 {
-	internal class ProcessFileCommand : ICommand
+	public class ProcessFileCommand : ICommand
 	{
 		public event EventHandler CanExecuteChanged;
 		readonly MainViewModel parent;
 		readonly string merchantWordsUrl = "https://www.merchantwords.com";
         static readonly object lockObject = new object();
 		List<string> combinationKeys;
-        static readonly Random rnd = new Random();
-        static ConcurrentBag<AmazonItem> resultList = new ConcurrentBag<AmazonItem>();
-        static ConcurrentDictionary<string, int> proxies;
 
         public ProcessFileCommand(MainViewModel parent)
 		{
@@ -38,7 +36,8 @@ namespace GoodsSearcher.Commands
 		{
 			return !string.IsNullOrEmpty(parent.InputFileProcessingLabelData) &&
 					!string.IsNullOrEmpty(parent.ProxiesFileProcessingLabelData) &&
-					!parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
+                    !string.IsNullOrEmpty(parent.ResultFolderLabelData) &&
+                    !parent.FileProcessingLabelData.Equals(StringConsts.FileProcessingLabelData_Processing);
 		}
 
         public void Execute(object parameter)
@@ -54,11 +53,14 @@ namespace GoodsSearcher.Commands
             }
             inputFileChosenPath = inputFileChosenPath.Trim();
 
-            parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+            Dispatcher.CurrentDispatcher.Invoke(() =>
+            {
+                parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Processing;
+            }, DispatcherPriority.DataBind);
 
             var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
-			proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
-            
+			WebHelper.Proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
+            var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
             Task.Factory.StartNew(() =>
             {
                 List<Task> TaskList = new List<Task>();
@@ -73,32 +75,41 @@ namespace GoodsSearcher.Commands
                 }
                 Task.WaitAll(TaskList.ToArray());
 
-            }).ContinueWith(async (action) =>
-            {
-                await ParallelQueue(combinationKeys, SearchItem);
-               
             }).ContinueWith((action) =>
             {
-                /*Save file to disk*/
-            })
-            .ContinueWith((action) =>
+                ParallelQueue(combinationKeys).GetAwaiter().GetResult();
+
+            }).ContinueWith((action) =>
             {
-                parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
-                Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
-            });
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Combination;ASIN;Volume");
+                foreach (var item in WebHelper.ResultList)
+                {
+                    sb.AppendLine(string.Format("{0};{1};{2}",
+                        item.Combination,
+                        item.ASIN,
+                        item.Price));
+                }
+                File.WriteAllText(Path.Combine(parent.ResultFolderLabelData, "AmazonData.csv"), sb.ToString());
+                Dispatcher.CurrentDispatcher.Invoke(() =>
+                {
+                    parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
+                    Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
+                },DispatcherPriority.DataBind);
+            }, uiScheduler);
         }
 
-		private static async Task ParallelQueue<T>(List<T> combinations, Func<T, Task> func)
+		private static async Task ParallelQueue<T>(List<T> combinations)
 		{
 			Queue pending = new Queue(combinations);
 			List<Task> working = new List<Task>();
 
 			while (pending.Count + working.Count != 0)
 			{
-				if (working.Count < 20 && pending.Count != 0)
+				if (working.Count < 1000 && pending.Count != 0)
 				{
 					var item = pending.Dequeue();
-                    working.Add(Task.Factory.StartNew(() => func((T)item)));
+                    working.Add(CustomTaskFactory.GetNewTask((T)item));
 				}
 				else
 				{
@@ -107,67 +118,6 @@ namespace GoodsSearcher.Commands
 				}
 			}
 		}
-
-        private static string getProxyAddress()
-        {
-            var itemsToRemove = proxies.Where(x => x.Value > 2);
-            foreach (var item in itemsToRemove)
-            {
-                proxies.TryRemove(item.Key, out int value);
-            }
-            int r = rnd.Next(proxies.Count);
-            return proxies.ElementAt(r).Key;
-        }
-
-        private static async Task SearchItem(string combination)
-        {
-            FlurlClient proxiedClient = null;
-            string correctProxy = string.Empty;
-            bool connectionAccepted = false;
-            do
-            {
-                correctProxy = getProxyAddress();
-                if (correctProxy == null)
-                {
-                    return;
-                }
-                proxiedClient = WebHelper.CreateProxiedClient(correctProxy);
-
-                try
-                {
-                    WebHelper.amazonPageUrl.WithClient(proxiedClient).WithTimeout(2).GetStringAsync().GetAwaiter().GetResult();
-                    connectionAccepted = true;
-                }
-                catch (FlurlHttpException ex)
-                {
-                    proxies.TryRemove(correctProxy, out int value);
-                    Debug.WriteLine(proxies.Count);
-                }
-            } while (!connectionAccepted);
-
-            bool continueWork = true;
-            int pageNumber = 1;
-            do
-            {
-                var url = WebHelper.CreateUrlToPageResults(combination, pageNumber);
-                var page = url.WithClient(proxiedClient).GetStringAsync().GetAwaiter().GetResult();
-                var itemsOnPage = WebHelper.GetSearchAmazonResults(page);
-                foreach (var item in itemsOnPage)
-                {
-                    var readyItem = item.InitPrice(proxiedClient);
-                    if (readyItem != null)
-                    {
-                        lock (lockObject)
-                        {
-                            resultList.Add(readyItem);
-                        }
-                        continueWork = false;
-                        break;
-                    }
-                }
-                pageNumber++;
-            } while (continueWork);
-        }
 
         private void scrapeDataFromMerchantWord(string title)
 		{

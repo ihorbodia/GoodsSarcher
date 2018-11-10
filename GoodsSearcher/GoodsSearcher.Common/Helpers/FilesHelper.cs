@@ -26,7 +26,23 @@ namespace GoodsSearcher.Common.Helpers
 			return selectedFileName;
 		}
 
-		public static List<string> ConvertCSVtoListofTitles(string strFilePath)
+        public static string SelectFolder()
+        {
+            FolderBrowserDialog openFolderDialog = new FolderBrowserDialog();
+
+            string selectedFolderName = string.Empty;
+            if (openFolderDialog.ShowDialog() == DialogResult.OK)
+            {
+                selectedFolderName = openFolderDialog.SelectedPath;
+            }
+            else
+            {
+                selectedFolderName = string.Empty;
+            }
+            return selectedFolderName;
+        }
+
+        public static List<string> ConvertCSVtoListofTitles(string strFilePath)
 		{
 			StreamReader sr = new StreamReader(strFilePath);
 			string[] headers = sr.ReadLine().Split(',');
@@ -46,7 +62,7 @@ namespace GoodsSearcher.Common.Helpers
 					currentRow = previousRow + currentRow;
 				}
 				string[] rows = Regex.Split(currentRow, ",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-				if (rows.Count() == 1)
+				if (rows.Count() < 11)
 				{
 					previousRow = currentRow;
 					continue;

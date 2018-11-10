@@ -9,7 +9,9 @@
         public const string FileProcessingLabelData_Processing = "Processing";
         public const string FileProcessingLabelData_ChooseInputFile = "Choose input CSV file";
         public const string FileProcessingLabelData_ChooseProxyFile = "Choose proxies file";
+        public const string FileProcessingLabelData_ChooseResultFolder = "Choose result folder";
         public const string FileProcessingLabelData_Finish = "Finished";
         public const string FileProcessingLabelData_ErrorMessage = "Something wrong";
+        public const string FileProcessingLabelData_Choose_folder = "Choose folder:";
     }
 }

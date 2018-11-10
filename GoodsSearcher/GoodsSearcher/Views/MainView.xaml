@@ -3,10 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:GoodsSearcher.Views"
                 mc:Ignorable="d" 
-             Height="auto"
-             Width="auto" d:DesignWidth="386.189" d:DesignHeight="231.461">
+             MinHeight="250" 
+             MinWidth="450">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="5*"/>
@@ -18,12 +17,15 @@
             <TextBlock Canvas.Top="15" Text="{Binding Path=InputFileProcessingLabelData, Mode=OneWay}" Width="auto" TextWrapping="WrapWithOverflow" Height="25"></TextBlock>
             <TextBlock Canvas.Top="40" Text="{Binding Path=ProxiesFileProcessingLabel, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
             <TextBlock Canvas.Top="55" Text="{Binding Path=ProxiesFileProcessingLabelData, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
+            <TextBlock Canvas.Top="80" Text="{Binding Path=ResultFolderLabel, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
+            <TextBlock Canvas.Top="95" Text="{Binding Path=ResultFolderLabelData, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
             <TextBlock Canvas.Bottom="0" Text="{Binding Path=FileProcessingLabel, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
             <TextBlock Canvas.Bottom="0" Canvas.Left="40" Text="{Binding Path=FileProcessingLabelData, Mode=OneWay}" Width="auto" Height="25"></TextBlock>
         </Canvas>
         <DockPanel Grid.Row="1">
             <Button Height="25" Command="{Binding ChooseInputFileCommand}" Content="Choose CSV file" Width="100" Margin="5,2,5,2" HorizontalAlignment="Left" ></Button>
             <Button Height="25" Command="{Binding ChooseProxiesFileCommand}" Content="Choose proxy file" Width="100" Margin="5,2,5,2" HorizontalAlignment="Left" ></Button>
+            <Button Height="25" Command="{Binding ChooseResultFolderCommand}" Content="Choose res. folder" Width="100" Margin="5,2,5,2" HorizontalAlignment="Left" ></Button>
             <Button Height="25" Command="{Binding ProcessFileCommand}" Content="Process file" Width="90" Margin="10,2,5,2" HorizontalAlignment="Right"></Button>
         </DockPanel>
     </Grid>

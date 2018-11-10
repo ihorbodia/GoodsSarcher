@@ -38,6 +38,10 @@ namespace GoodsSearcher.Commands
                 {
                     parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ChooseProxyFile;
                 }
+                if (string.IsNullOrEmpty(parent.ResultFolderLabelData))
+                {
+                    parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_ChooseResultFolder;
+                }
             }
         }
     }
