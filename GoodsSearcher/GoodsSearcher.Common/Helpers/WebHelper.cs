@@ -57,28 +57,28 @@ namespace Sraper.Common.Models
             for (int i = 0; i < 21; i++)
             {
                 var document = htmlDocument.DocumentNode.SelectSingleNode($"//*[@id='result_{i}']/div/div/div/div[2]/div[1]/div[1]/a");
-
-                if (document != null)
+				
+				if (document != null)
                 {
-                    items.Add(new AmazonItem(
+					var asin = htmlDocument.DocumentNode.SelectSingleNode($"//*[@id='result_{i}']").Attributes["data-asin"].Value;
+					var price = htmlDocument.DocumentNode.SelectSingleNode($"//*[@id='result_{i}']/div/div/div/div[2]/div[2]/div[1]/div[1]/a/span[2]")?.InnerText;
+					if (!string.IsNullOrEmpty(price) && price.Contains("-"))
+					{
+						price = null;
+					}
+					items.Add(new AmazonItem(
                         document.Attributes["href"].Value,
-                        htmlDocument.DocumentNode.SelectSingleNode($"//*[@id='result_{i}']").Attributes["data-asin"].Value,
-                        combination));
+						asin,
+						combination,
+						price));
                 }
             }
             return items;
         }
 
-        public static FlurlClient CreateProxiedClient(string proxyUrl)
+        public static CustomWebClient CreateProxiedClient(string proxyUrl)
         {
-            HttpMessageHandler handler = new HttpClientHandler()
-            {
-                Proxy = new WebProxy(proxyUrl),
-                UseProxy = true
-            };
-
-            HttpClient client = new HttpClient(handler);
-			return new FlurlClient(client).EnableCookies();
+			return new CustomWebClient(new WebProxy(proxyUrl));
         }
 
 		public static FlurlClient CreateClient()

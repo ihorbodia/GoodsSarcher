@@ -106,7 +106,7 @@ namespace GoodsSearcher.Commands
 
 			while (pending.Count + working.Count != 0)
 			{
-				if (working.Count < 1000 && pending.Count != 0)
+				if (working.Count < 20 && pending.Count != 0)
 				{
 					var item = pending.Dequeue();
                     working.Add(CustomTaskFactory.GetNewTask((T)item));

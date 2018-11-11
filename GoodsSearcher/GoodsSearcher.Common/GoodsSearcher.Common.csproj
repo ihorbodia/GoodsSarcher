@@ -60,6 +60,9 @@
     <Compile Include="Helpers\CustomTaskFactory.cs" />
     <Compile Include="Helpers\WebHelper.cs" />
     <Compile Include="Models\AmazonItem.cs" />
+    <Compile Include="Models\CustomWebClient.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Models\TaskItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

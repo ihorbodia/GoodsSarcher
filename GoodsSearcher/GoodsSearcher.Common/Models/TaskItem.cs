@@ -1,5 +1,4 @@
-﻿using Flurl.Http;
-using Sraper.Common.Models;
+﻿using Sraper.Common.Models;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -7,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace GoodsSearcher.Common.Models
 {
-    public class TaskItem
+	public class TaskItem
     {
         public Task Task { get; set; }
         public string workedProxyAddress;
-        public FlurlClient proxiedClient = null;
+        public CustomWebClient proxiedClient = null;
 
         public Task StartTask(string combination)
         {
@@ -42,11 +41,11 @@ namespace GoodsSearcher.Common.Models
                     }
                     try
                     {
-                        WebHelper.amazonPageUrl.WithClient(proxiedClient).WithTimeout(2).GetStringAsync().GetAwaiter().GetResult();
-                        connectionAccepted = true;
+						proxiedClient.DownloadData(WebHelper.amazonPageUrl);
+						connectionAccepted = true;
                         workedProxyAddress = correctProxy;
                     }
-                    catch (FlurlHttpException ex)
+                    catch (Exception ex)
                     {
                         WebHelper.Proxies.TryRemove(correctProxy, out int value);
                         workedProxyAddress = string.Empty;
@@ -59,7 +58,7 @@ namespace GoodsSearcher.Common.Models
             return Task;
         }
 
-        private async void SearchItemOnPage(string combination)
+        private void SearchItemOnPage(string combination)
         {
             bool continueWork = true;
             int pageNumber = 1;
@@ -67,10 +66,10 @@ namespace GoodsSearcher.Common.Models
             {
                 string page = string.Empty;
                 var url = WebHelper.CreateUrlToPageResults(combination, pageNumber);
-                try
+				try
                 {
-                    page = await url.WithClient(proxiedClient).GetStringAsync();
-                }
+					page = proxiedClient.DownloadString(url);
+				}
                 catch (Exception ex)
                 {
                     break;
@@ -82,10 +81,15 @@ namespace GoodsSearcher.Common.Models
                 }
                 foreach (var item in itemsOnPage)
                 {
-                    var readyItem = item.InitPrice(proxiedClient);
+					var readyItem = item;
                     if (readyItem != null)
                     {
-                        WebHelper.ResultList.Add(readyItem.Result);
+						if (string.IsNullOrEmpty(readyItem.Price))
+						{
+							readyItem.InitPrice(proxiedClient);
+						}
+						readyItem.ClearPrice();
+						WebHelper.ResultList.Add(readyItem);
                         continueWork = false;
                         break;
                     }
