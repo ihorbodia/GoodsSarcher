@@ -32,6 +32,7 @@ namespace GoodsSearcher.ViewModels
             FileProcessingLabel = StringConsts.FileProcessingLabelConst;
             ResultFolderLabel = StringConsts.FileProcessingLabelData_Choose_folder;
             FileProcessingLabelData = string.Empty;
+            initPaths();
         }
 
         public ICommand ProcessFileCommand { get; private set; }
@@ -65,6 +66,7 @@ namespace GoodsSearcher.ViewModels
                 if (_resultFolderLabelData != value)
                 {
                     _resultFolderLabelData = value;
+                    Properties.Settings.Default.OutputCSV = value;
                     RaisePropertyChanged(nameof(ResultFolderLabelData));
                 }
             }
@@ -96,6 +98,7 @@ namespace GoodsSearcher.ViewModels
                 if (_inputFileProcessingLabelData != value)
                 {
                     _inputFileProcessingLabelData = value;
+                    Properties.Settings.Default.InputCSV = value;
                     RaisePropertyChanged(nameof(InputFileProcessingLabelData));
                 }
             }
@@ -127,6 +130,7 @@ namespace GoodsSearcher.ViewModels
                 if (_proxiesFileProcessingLabelData != value)
                 {
                     _proxiesFileProcessingLabelData = value;
+                    Properties.Settings.Default.InputProxies = value;
                     RaisePropertyChanged(nameof(ProxiesFileProcessingLabelData));
                 }
             }
@@ -165,7 +169,15 @@ namespace GoodsSearcher.ViewModels
 
         private void RaisePropertyChanged(string property)
         {
+            Properties.Settings.Default.Save();
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+        }
+
+        private void initPaths()
+        {
+            ResultFolderLabelData = Properties.Settings.Default.OutputCSV;
+            InputFileProcessingLabelData = Properties.Settings.Default.InputCSV;
+            ProxiesFileProcessingLabelData = Properties.Settings.Default.InputProxies;
         }
     }
 }
