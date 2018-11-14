@@ -1,4 +1,5 @@
 ﻿using HtmlAgilityPack;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 namespace GoodsSearcher.Common.Helpers
@@ -23,6 +24,8 @@ namespace GoodsSearcher.Common.Helpers
 			return dataTable;
 		}
 
+
+
 		public static int ToInt(this string s)
 		{
 			int i;
@@ -33,5 +36,20 @@ namespace GoodsSearcher.Common.Helpers
 			}
 			return 0;
 		}
+
+        public static List<string[]> SplitTitle(string title)
+        {
+            var result = new List<string[]>();
+            var items = title.Split(' ');
+
+            string[] firstGroup = { items[0] ?? "", items[1] ?? "", items[2] ?? "" };
+            string[] secondGroup = { items[1] ?? "", items[2] ?? "", items[3] ?? "" };
+            string[] thirdGroup = { items[2] ?? "", items[3] ?? "", items[4] ?? "" };
+
+            result.Add(firstGroup);
+            result.Add(secondGroup);
+            result.Add(thirdGroup);
+            return result;
+        }
 	}
 }

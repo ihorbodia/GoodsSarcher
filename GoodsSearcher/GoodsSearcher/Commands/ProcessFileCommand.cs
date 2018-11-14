@@ -121,7 +121,7 @@ namespace GoodsSearcher.Commands
 
         private void scrapeDataFromMerchantWord(string title)
         {
-            using (FlurlClient flurlClient = new FlurlClient())
+            using (FlurlClient flurlClient = new FlurlClient().EnableCookies())
             {
                 merchantWordsUrl.AppendPathSegment("login")
                 .WithClient(flurlClient)
@@ -138,9 +138,9 @@ namespace GoodsSearcher.Commands
                     {
                         var firstTablePage = merchantWordsUrl.AppendPathSegment(string.Format("search/uk/{0}%20{1}%20{2}/sort-highest", items[1], items[2], items[3]))
                         .WithClient(flurlClient)
-                        .GetStringAsync();
+                        .GetStringAsync().GetAwaiter().GetResult();
 
-                        var firstNode = WebHelper.GetSearchMerchantWordsResultsTable(firstTablePage.Result);
+                        var firstNode = WebHelper.GetSearchMerchantWordsResultsTable(firstTablePage);
                         var firstEumerable = DataHelper.ConvertHtmlTableToDataTable(firstNode)?
                             .AsEnumerable();
                         var firstVolumeString = firstEumerable?
@@ -189,15 +189,18 @@ namespace GoodsSearcher.Commands
                     string maxCombinationKey = string.Empty;
                     if (combinations.Any())
                     {
-                        maxCombinationKey = combinations.Aggregate((x, y) => x.Value > y.Value ? x : y).Key;
+                        maxCombinationKey = combinations.FirstOrDefault(x => x.Value == combinations.Values.Max()).Key;
                     }
                     else
                     {
                         return;
                     }
-                    combinationKeys.Add(maxCombinationKey);
+                    if (maxCombinationKey != null)
+                    {
+                        combinationKeys.Add(maxCombinationKey);
+                    }
                 }
-                catch (Exception ex)
+                catch (FlurlHttpException ex)
                 {
                     Debug.WriteLine(ex.Message);
                     Debug.WriteLine(title);
@@ -213,11 +216,12 @@ namespace GoodsSearcher.Commands
                 var items = combination.Split(' ');
                 var tablePage = merchantWordsUrl.AppendPathSegment(string.Format($"search/uk/{items[0]?? ""}%20{ items[1]?? ""}%20{items[2]?? ""}/sort-highest"))
                        .WithClient(flurlClient)
+                       .WithTimeout(5)
                        .GetStringAsync();
 
                 var node = WebHelper.GetSearchMerchantWordsResultsTable(tablePage.Result);
-                var enumerable = DataHelper.ConvertHtmlTableToDataTable(node)?
-                    .AsEnumerable();
+                var dt = DataHelper.ConvertHtmlTableToDataTable(node);
+                var enumerable = dt?.AsEnumerable();
                 var amazonSearchTermValue = enumerable?
                     .FirstOrDefault(datarow => datarow[0].ToString()
                     .Equals($"{items[4]} {items[5]} {items[6]}".ToLower()))?
