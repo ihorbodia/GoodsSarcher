@@ -89,7 +89,10 @@ namespace GoodsSearcher.Common.Models
 							readyItem.InitPrice(proxiedClient);
 						}
 						readyItem.ClearPrice();
-						WebHelper.ResultList.Add(readyItem);
+                        if (readyItem.IsProductDispatched(proxiedClient))
+                        {
+                            WebHelper.ResultList.Add(readyItem);
+                        }
                         continueWork = false;
                         break;
                     }

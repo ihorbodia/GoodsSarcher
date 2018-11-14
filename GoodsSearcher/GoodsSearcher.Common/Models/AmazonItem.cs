@@ -28,7 +28,21 @@ namespace GoodsSearcher.Common.Models
 			Price = Price.Replace(latinCapLetter, "").Replace(poundSymbol, "");
 		}
 
-		public AmazonItem InitPrice(CustomWebClient client)
+        public bool IsProductDispatched(CustomWebClient client)
+        {
+            if (string.IsNullOrEmpty(Href))
+            {
+                return false;
+            }
+            var html = client.DownloadString(Href);
+            if (html.Contains("Dispatched from and sold by Amazon"))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public AmazonItem InitPrice(CustomWebClient client)
 		{
 			if (string.IsNullOrEmpty(Href))
 			{
