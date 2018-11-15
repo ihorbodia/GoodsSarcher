@@ -24,11 +24,6 @@ namespace GoodsSearcher.Commands
         
         
         List<string> combinationKeys;
-
-        public ProcessFileCommand()
-        {
-            
-        }
         public ProcessFileCommand(MainViewModel parent)
 		{
 			this.parent = parent;
@@ -67,19 +62,16 @@ namespace GoodsSearcher.Commands
             var titles = FilesHelper.ConvertCSVtoListofTitles(inputFileChosenPath);
 			WebHelper.Proxies = FilesHelper.ConvertProxyFileToDictionary(proxiesFileChosenPath);
             var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
-            Task.Factory.StartNew(() =>
+
+			List<Task> TaskList = new List<Task>();
+			foreach (var title in titles)
+			{
+				TaskList.Add(scrapeDataFromMerchantWord(title));
+			}
+			Task.WhenAll(TaskList.ToArray());
+			Task.Factory.StartNew(() =>
             {
-                List<Task> TaskList = new List<Task>();
-                foreach (var title in titles)
-                {
-                    var LastTask = new Task(() =>
-                    {
-                        scrapeDataFromMerchantWord(title);
-                    });
-                    LastTask.Start();
-                    TaskList.Add(LastTask);
-                }
-                Task.WaitAll(TaskList.ToArray());
+                
 
             }).ContinueWith((action) =>
             {
@@ -91,11 +83,6 @@ namespace GoodsSearcher.Commands
                 parent.FileProcessingLabelData = StringConsts.FileProcessingLabelData_Finish;
                 Console.WriteLine(StringConsts.FileProcessingLabelData_Finish);
             }, uiScheduler);
-        }
-
-        public static void AppendData(string lineContent, TextWriter w)
-        {
-            w.Write(lineContent);
         }
 
         private static async Task ParallelQueue<T>(List<T> combinations)
@@ -118,22 +105,27 @@ namespace GoodsSearcher.Commands
 			}
 		}
 
-        private void scrapeDataFromMerchantWord(string title)
+        private Task scrapeDataFromMerchantWord(string title)
         {
-            using (FlurlClient flurlClient = new FlurlClient().EnableCookies())
-            {
-                merchantWordsUrl.AppendPathSegment("login")
-                .WithClient(flurlClient)
-                .PostUrlEncodedAsync(new
-                {
-                    email = "goncalo.cabecinha@gmail.com",
-                    password = "qwertymns"
-                });
-                if (!IsResultGotByTittleCorrect(flurlClient, title) && !IsResultGotByAmazonSearchTermCorrect(flurlClient, title))
-                {
-                    SearchByWholeTitle(flurlClient, title);
-                }
-            }
+			return Task.Factory.StartNew(() =>
+			{
+				using (FlurlClient flurlClient = new FlurlClient().EnableCookies())
+				{
+					merchantWordsUrl.AppendPathSegment("login")
+					.WithClient(flurlClient)
+					.PostUrlEncodedAsync(new
+					{
+						email = "goncalo.cabecinha@gmail.com",
+						password = "qwertymns"
+					});
+					if (!IsResultGotByTittleCorrect(flurlClient, title) && !IsResultGotByAmazonSearchTermCorrect(flurlClient, title))
+					{
+						SearchByWholeTitle(flurlClient, title);
+					}
+					//Directory.Delete(Path.Combine(Path.GetTempPath(), "GoodsSearcher"), true);
+				}
+			});
+			
 		}
 
         private void SearchByWholeTitle(FlurlClient flurlClient, string title)
@@ -147,17 +139,12 @@ namespace GoodsSearcher.Commands
                     if (items.Length == 0) { continue; }
                     merchantWordsUrl.AppendPathSegment($"search/uk/{items[0]}%20{items[1]}%20{items[2]}/sort-highest.csv")
                         .WithClient(flurlClient)
-                        .DownloadFileAsync(Path.GetTempPath())
+                        .DownloadFileAsync(Path.Combine(Path.GetTempPath(), "GoodsSearcher"))
                         .GetAwaiter().GetResult();
                     var data = FilesHelper.ConvertCSVtoDataTable(items);
                     if (data.Rows.Count == 0) { continue; }
 
                     combinations.Add(data.Rows[0].ItemArray[0].ToString(), DataHelper.ToInt(data.Rows[0].ItemArray[1].ToString()));
-
-                    if (File.Exists(FilesHelper.getPathToCsvDownloadedFile(items)))
-                    {
-                        File.Delete(FilesHelper.getPathToCsvDownloadedFile(items));
-                    }
                 }
                 var maxValue = DataHelper.GetMaximumCombinationFromDict(combinations);
                 if (maxValue.Value != 0)
@@ -183,17 +170,12 @@ namespace GoodsSearcher.Commands
                     if (items.Length == 0) { continue; }
                     merchantWordsUrl.AppendPathSegment($"search/uk/{items[0]}%20{items[1]}%20{items[2]}/sort-highest.csv")
                         .WithClient(flurlClient)
-                        .DownloadFileAsync(Path.GetTempPath())
+                        .DownloadFileAsync(Path.Combine(Path.GetTempPath(), "GoodsSearcher"))
                         .GetAwaiter().GetResult();
                     var data = FilesHelper.ConvertCSVtoDataTable(items);
                     if (data.Rows.Count == 0) { continue; }
 
                     combinations.Add(data.Rows[0].ItemArray[0].ToString(), DataHelper.ToInt(data.Rows[0].ItemArray[1].ToString()));
-
-                    if (File.Exists(FilesHelper.getPathToCsvDownloadedFile(items)))
-                    {
-                        File.Delete(FilesHelper.getPathToCsvDownloadedFile(items));
-                    }
                 }
                 var maxValue = DataHelper.GetMaximumCombinationFromDict(combinations);
                 if (maxValue.Value == 0)
@@ -225,7 +207,7 @@ namespace GoodsSearcher.Commands
                     merchantWordsUrl
                         .AppendPathSegment($"search/uk/{items[0]}%20{items[1]}%20{items[2]}/sort-highest.csv")
                         .WithClient(flurlClient)
-                        .DownloadFileAsync(Path.GetTempPath()).GetAwaiter().GetResult();
+                        .DownloadFileAsync(Path.Combine(Path.GetTempPath(), "GoodsSearcher")).GetAwaiter().GetResult();
                     var data = FilesHelper.ConvertCSVtoDataTable(items);
                     if (data.Rows.Count == 0) { continue; }
 
@@ -233,11 +215,6 @@ namespace GoodsSearcher.Commands
                         string.Join(" ", items).ToLower()))
                     {
                         combinations.Add(string.Join(" ", items), DataHelper.ToInt(data.Rows[0].ItemArray[1].ToString()));
-                    }
-
-                    if (File.Exists(FilesHelper.getPathToCsvDownloadedFile(items)))
-                    {
-                        File.Delete(FilesHelper.getPathToCsvDownloadedFile(items));
                     }
                 }
                 var maxValue = DataHelper.GetMaximumCombinationFromDict(combinations);
