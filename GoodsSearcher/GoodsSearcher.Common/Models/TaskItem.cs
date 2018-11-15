@@ -1,4 +1,5 @@
-﻿using Sraper.Common.Models;
+﻿using GoodsSearcher.Common.Helpers;
+using Sraper.Common.Models;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -91,7 +92,7 @@ namespace GoodsSearcher.Common.Models
 						readyItem.ClearPrice();
                         if (readyItem.IsProductDispatched(proxiedClient))
                         {
-                            WebHelper.ResultList.Add(readyItem);
+                            DataHelper.WriteDataToFile(readyItem);
                         }
                         continueWork = false;
                         break;

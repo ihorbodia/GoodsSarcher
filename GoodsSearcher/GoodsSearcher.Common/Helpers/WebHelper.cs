@@ -17,7 +17,6 @@ namespace Sraper.Common.Models
         public static string amazonPageUrl = "https://www.amazon.co.uk/";
         static readonly Random rnd = new Random();
         public static ConcurrentDictionary<string, int> Proxies;
-        public static ConcurrentBag<AmazonItem> ResultList = new ConcurrentBag<AmazonItem>();
         public static HtmlNode GetSearchMerchantWordsResultsTable(string pageContent)
 		{
 			HtmlDocument htmlDocument = new HtmlDocument();

@@ -1,12 +1,26 @@
-﻿using HtmlAgilityPack;
+﻿using GoodsSearcher.Common.Models;
+using HtmlAgilityPack;
+using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 namespace GoodsSearcher.Common.Helpers
 {
 	public static class DataHelper
 	{
-		public static DataTable ConvertHtmlTableToDataTable(HtmlNode table)
+        public static StreamWriter sw;
+        static readonly object lockObject = new object();
+
+        public static void WriteDataToFile(AmazonItem item)
+        {
+            lock(lockObject)
+            {
+                sw.WriteLine($"{item.Combination},{item.ASIN},{item.Price}{Environment.NewLine}");
+            }
+        }
+
+        public static DataTable ConvertHtmlTableToDataTable(HtmlNode table)
 		{
 			if (table == null)
 			{
@@ -24,8 +38,6 @@ namespace GoodsSearcher.Common.Helpers
 			return dataTable;
 		}
 
-
-
 		public static int ToInt(this string s)
 		{
 			int i;
@@ -37,18 +49,60 @@ namespace GoodsSearcher.Common.Helpers
 			return 0;
 		}
 
-        public static List<string[]> SplitTitle(string title)
+        public static KeyValuePair<string, int> GetMaximumCombinationFromDict(Dictionary<string, int> combinations)
+        {
+            KeyValuePair<string, int> maxValue = new KeyValuePair<string, int>(string.Empty, 0);
+            foreach (var item in combinations)
+            {
+                if (item.Value > maxValue.Value)
+                {
+                    maxValue = item;
+                }
+            }
+            return maxValue;
+        }
+
+        public static List<string[]> SplitTitle(string title, bool isMoreThanThreeParts)
         {
             var result = new List<string[]>();
-            var items = title.Split(' ');
-
-            string[] firstGroup = { items[0] ?? "", items[1] ?? "", items[2] ?? "" };
-            string[] secondGroup = { items[1] ?? "", items[2] ?? "", items[3] ?? "" };
-            string[] thirdGroup = { items[2] ?? "", items[3] ?? "", items[4] ?? "" };
-
-            result.Add(firstGroup);
-            result.Add(secondGroup);
-            result.Add(thirdGroup);
+            int firstWordIndex = 1;
+            int secondWordIndex = 2;
+            int thirdWordIndex = 3;
+            if (!isMoreThanThreeParts)
+            {
+                var items = title.Split(' ');
+                while (thirdWordIndex < items.Length)
+                {
+                    string[] combination = { items[firstWordIndex] ?? "", items[secondWordIndex] ?? "", items[thirdWordIndex] ?? "" };
+                    if (combination.Length > 0)
+                    {
+                        result.Add(combination);
+                        if (result.Count == 3)
+                        {
+                            break;
+                        }
+                        firstWordIndex++;
+                        secondWordIndex++;
+                        thirdWordIndex++;
+                    }
+                }
+            }
+            else
+            {
+                var items = title.Split(' ');
+                while (thirdWordIndex < items.Length)
+                {
+                    string[] combination = { items[firstWordIndex] ?? "", items[secondWordIndex] ?? "", items[thirdWordIndex] ?? "" };
+                    if (combination.Length > 0)
+                    {
+                        result.Add(combination);
+                        firstWordIndex++;
+                        secondWordIndex++;
+                        thirdWordIndex++;
+                    }
+                }
+            }
+            
             return result;
         }
 	}

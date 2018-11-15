@@ -42,6 +42,36 @@ namespace GoodsSearcher.Common.Helpers
             return selectedFolderName;
         }
 
+
+        public static string getPathToCsvDownloadedFile(string[] combination)
+        {
+            return Path.Combine(Path.GetTempPath(), $"{combination[0]} {combination[1]} {combination[2]}-sort-highest.csv");
+        }
+
+        public static DataTable ConvertCSVtoDataTable(string[] combination)
+        {
+            var strFilePath = getPathToCsvDownloadedFile(combination);
+            StreamReader sr = new StreamReader(strFilePath);
+            string[] headers = sr.ReadLine().Split(',');
+            DataTable dt = new DataTable();
+            foreach (string header in headers)
+            {
+                dt.Columns.Add(header);
+            }
+            while (!sr.EndOfStream)
+            {
+                string[] rows = Regex.Split(sr.ReadLine(), ",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+                DataRow dr = dt.NewRow();
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    dr[i] = rows[i];
+                }
+                dt.Rows.Add(dr);
+            }
+            sr.Dispose();
+            return dt;
+        }
+
         public static List<string> ConvertCSVtoListofTitles(string strFilePath)
 		{
 			StreamReader sr = new StreamReader(strFilePath);
